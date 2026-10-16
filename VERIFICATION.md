@@ -45,3 +45,9 @@ The package cache, offline upload, hotspot selection and AI internet reminders w
 2.0.2 将网络初始化移到 WebServer 启动之前，并在初始化失败时保留 BLE 而不启动监听。已按用户明确授权，通过 USB 只写当前 OTA 应用分区；实际分区表确认为 16 MB、双 3 MB，NVS、分区表及另一个应用区未写入。写入校验通过，复位后日志正常出现 2.0.2、NET 和 HTTP 就绪标记，观察期内未再出现断言或重复启动。蓝牙实际连接结果将在用户测试后补充；没有发送电机运动指令。
 
 Physical serial logs reproduced the 2.0.1 boot loop and matched its published ELF hash. Symbolication identified an HTTP socket opened before lwIP initialization. With user authorization, 2.0.2 was written to the currently selected OTA application partition only. Flash data verification passed; NVS, the partition table and the other app partition were preserved. Startup reached the network/HTTP ready markers without a new panic. Physical BLE connection is pending the user's test; motors were not exercised.
+
+### 2.0.2 BLE confirmation
+
+修复后串口记录到 `[BLE] Client connected`，用户随后明确确认 iPhone App 已连接成功。启动与蓝牙连接问题已真机复验通过；未执行电机运动或真实 OTA 升级流程。
+
+Serial logs recorded a BLE client connection, and the user confirmed successful connection in the iPhone app. Physical startup and BLE reconnection passed; motor motion and an actual OTA transfer were not tested in this recovery run.
