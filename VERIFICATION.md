@@ -37,3 +37,11 @@ Build metadata records source and image checksums. The dist folder is excluded f
 2026-10-16: 已重新构建 16 MB / OPI / 双 3 MB 固件。新增目标分区绑定、默认关闭、用户选择保留热点和错误分区标记拒绝的策略检查。网页端 8 项测试通过；浏览器验证了无设备预下载、损坏包不覆盖缓存、刷新后持久化、离线上传期间零在线下载、默认开启开关与关闭选项、升级后恢复互联网提示及桌面/手机双语布局。Android 59 项测试与 Lint/APK 构建通过；iOS 81 项本机检查、24 项遥控检查和原签名项目模拟器构建通过。本轮均未进行真机 OTA 或真实手机切网。
 
 The package cache, offline upload, hotspot selection and AI internet reminders were verified with host tests and mocked browser device responses. Android/iOS builds passed. Physical OTA, hotspot shutdown and phone network recovery remain pending. The earlier 2.0.0 Release was published after the initial record above; 2.0.1 is authorized for publication in this update.
+
+## 2.0.2 · Physical startup crash diagnosis and USB recovery
+
+2026-10-16：真实设备串口确认 2.0.1 在广播后发生 `xQueueSemaphoreTake` 断言并持续重启。运行镜像 ELF SHA 前缀 `cb4dcadf6` 与已发布的 2.0.1 完全对应。解析回溯定位到 `LooiWifiOta::begin → WebServer::begin → NetworkServer::begin → lwip_socket → sys_mutex_lock`，即在 `WiFi.mode(WIFI_STA)` 初始化 lwIP 之前打开监听 socket。
+
+2.0.2 将网络初始化移到 WebServer 启动之前，并在初始化失败时保留 BLE 而不启动监听。已按用户明确授权，通过 USB 只写当前 OTA 应用分区；实际分区表确认为 16 MB、双 3 MB，NVS、分区表及另一个应用区未写入。写入校验通过，复位后日志正常出现 2.0.2、NET 和 HTTP 就绪标记，观察期内未再出现断言或重复启动。蓝牙实际连接结果将在用户测试后补充；没有发送电机运动指令。
+
+Physical serial logs reproduced the 2.0.1 boot loop and matched its published ELF hash. Symbolication identified an HTTP socket opened before lwIP initialization. With user authorization, 2.0.2 was written to the currently selected OTA application partition only. Flash data verification passed; NVS, the partition table and the other app partition were preserved. Startup reached the network/HTTP ready markers without a new panic. Physical BLE connection is pending the user's test; motors were not exercised.

@@ -15,7 +15,7 @@
 #include "DevicePanel.h"
 
 constexpr char OTA_PASSWORD[] = "12345678";
-constexpr char DEVICE_VERSION[] = "2.0.1";
+constexpr char DEVICE_VERSION[] = "2.0.2";
 constexpr char RELEASE_MANIFEST[] = "https://github.com/xlle-er/LOOI-DF26-Firmware/releases/latest/download/looi-s3-manifest.json";
 
 class LooiWifiOta {
@@ -36,8 +36,13 @@ class LooiWifiOta {
     const uint32_t marker=prefs_.getUInt("ota_ap_once",0);
     autoApSuppressed_=running && suppressHotspotAfterOta(marker,running->address);
     if(marker) prefs_.remove("ota_ap_once");
+    // WiFi.mode initializes lwIP; opening a socket before this can assert on a null tcpip mutex.
+    WiFi.persistent(false);
+    if(!WiFi.mode(WIFI_STA)) { error_="Wi-Fi network stack initialization failed"; Serial.printf("[NET] %s\n",error_.c_str()); return; }
+    WiFi.setHostname(id_.c_str());
+    Serial.println("[NET] Wi-Fi network stack initialized");
     configureRoutes(); server_.begin();
-    WiFi.persistent(false); WiFi.mode(WIFI_STA); WiFi.setHostname(id_.c_str());
+    Serial.println("[HTTP] Management server started");
     if (settings_.ssid[0]) connect(settings_.ssid, settings_.password, false);
     else if(!autoApSuppressed_) openAp();
     Serial.printf("[DEVICE] %s version=%s hold BOOT 3s for setup\n",id_.c_str(),DEVICE_VERSION);
