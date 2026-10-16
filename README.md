@@ -69,7 +69,7 @@ gh release create v2.0.0 dist/looi-s3.bin dist/looi-s3-manifest.json dist/SHA256
 
 ## English
 
-ESP32-S3 chassis firmware with BLE/Wi-Fi control, hotspot provisioning, a built-in panel, persistent motor calibration and dual-slot OTA. The final hardware uses DC motors only: there is no pitch servo or I²C.
+ESP32-S3 chassis firmware with BLE/Wi-Fi control, hotspot provisioning, a built-in panel, persistent motor calibration and dual-slot OTA. 
 
 Clients: [Web DF26](https://github.com/xlle-er/LOOI_DF26/tree/DF26), [iOS](https://github.com/xlle-er/LOOI-DF26-IOS), [Android](https://github.com/xlle-er/LOOI-DF26-ANDROID).
 
