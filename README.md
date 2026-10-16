@@ -4,7 +4,7 @@
 
 ## 简体中文
 
-ESP32-S3 底盘固件：BLE / Wi-Fi 控制、热点配网、设备面板、电机方向校准、双分区 OTA。最终硬件只有直流电机，不使用俯仰舵机和 I²C。
+ESP32-S3 底盘固件：BLE / Wi-Fi 控制、热点配网、设备面板、电机方向校准、双分区 OTA。
 
 相关客户端：[网页 DF26](https://github.com/xlle-er/LOOI_DF26/tree/DF26) · [iOS](https://github.com/xlle-er/LOOI-DF26-IOS) · [Android](https://github.com/xlle-er/LOOI-DF26-ANDROID)。
 
