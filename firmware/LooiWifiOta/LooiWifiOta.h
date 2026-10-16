@@ -82,7 +82,7 @@ class LooiWifiOta {
         }
         candidate_=false; pendingPassword_=""; connectedAt_=now; networkState_="connected";
       }
-      if(ap_ && connectedAt_ && now-connectedAt_>=60000 && !writing_ && !otaMode_) { WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA); ap_=false; }
+      if(ap_ && hotspotGraceExpired(now,connectedAt_) && !writing_ && !otaMode_) { WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA); ap_=false; Serial.println("[AP] Closed after 60 seconds on Wi-Fi"); }
     } else {
       if(mdns_) { MDNS.end(); mdns_=false; }
       if(!offlineAt_) offlineAt_=now;
@@ -179,7 +179,16 @@ class LooiWifiOta {
     pendingSsid_=ssid; pendingPassword_=password; candidate_=candidate; connecting_=true; connectAt_=millis(); connectedAt_=0; error_=""; networkState_="connecting";
     WiFi.begin(ssid.c_str(),password.c_str());
   }
-  void openAp() { autoApSuppressed_=false; if(ap_) return; WiFi.mode(WIFI_AP_STA); ap_=WiFi.softAP(apName_.c_str(),OTA_PASSWORD,1,false,4); if(!ap_) error_="Could not start hotspot"; connectedAt_=WiFi.status()==WL_CONNECTED?millis():0; }
+  void openAp() {
+    autoApSuppressed_=false;
+    // A repeated BOOT hold grants another full connection window.
+    connectedAt_=WiFi.status()==WL_CONNECTED?millis():0;
+    if(ap_) { Serial.println("[AP] Already active; connection window renewed"); return; }
+    if(!WiFi.mode(WIFI_AP_STA)) { error_="Could not enable hotspot mode"; Serial.printf("[AP] %s\n",error_.c_str()); return; }
+    ap_=WiFi.softAP(apName_.c_str(),OTA_PASSWORD,1,false,4);
+    if(!ap_) { error_="Could not start hotspot"; Serial.printf("[AP] %s\n",error_.c_str()); }
+    else Serial.printf("[AP] Started %s at http://%s/\n",apName_.c_str(),WiFi.softAPIP().toString().c_str());
+  }
   void status(JsonDocument &doc) {
     hardware.status(doc);
     doc["device_id"]=id_; doc["name"]="LOOI Body"; doc["firmware_version"]=DEVICE_VERSION; doc["chip"]="ESP32-S3";

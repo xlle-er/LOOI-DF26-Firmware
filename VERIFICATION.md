@@ -1,4 +1,12 @@
+## 2.1.0 stable release authorization — 2026-10-16
+
+The maintainer explicitly authorized stable publication after the N16R8 USB flash and hotspot confirmation below. Version 2.1.0 is promoted to stable/latest with the BOOT hotspot fix. Outstanding physical acceptance items remain untested; earlier prerelease gate statements describe the previous release state.
+
 ## 2.1.0 development verification — 2026-10-16
+
+BOOT hotspot follow-up: fixed unsigned timeout underflow when a connected device opens its AP after the loop timestamp was sampled. Repeating the BOOT hold now renews the existing AP window, and serial `[AP]` messages report startup/failure/timeout. Host policy regression checks pass for stale timestamps, renewed windows, the 60-second boundary, zero and clock rollover. Physical BOOT/AP and LAN OTA acceptance remain pending; no USB device was attached for this fix.
+
+Physical follow-up (2026-10-16): with explicit user authorization, detected ESP32-S3 with 16 MB Flash / 8 MB PSRAM on the USB-UART bridge. Backed up the first 64 KB, validated partition entries and OTA selection (sequence 2, app1 at 0x310000), and verified local source/image hashes. Wrote only app1 with the hotspot fix (image SHA-256 `84f54fe76691a73efab3f10b415c2eb3672d83cf2e7de557f2341b24d6c5f14d`); esptool data hash verification passed at 115200 baud. NVS, partition table, otadata and app0 were not written. After a normal reset, repeated UART status replies confirmed firmware 2.1.0, `ap_active=true`, `LOOI-Setup-77c398`, `192.168.4.1`, and no device error. The user confirmed the hotspot was visible after the requested BOOT test. Hardware wiring remains unconfigured with motor outputs disabled; no motion/configuration commands were sent. The connected-router grace-window and actual LAN OTA transfer still require physical acceptance.
 
 This section describes the new persistent-wiring implementation, not a stable release or hardware certification.
 
@@ -21,7 +29,7 @@ This section describes the new persistent-wiring implementation, not a stable re
 | Rendered installer via Codex IAB | PASS: nonblank, Chinese/English, custom GPIO editing, confirmation reset, guard message, no relevant console warnings/errors |
 | Cross-platform Agent CI | PASS, all 6 jobs: macOS/Windows/Linux × Python 3.10/3.12; see linked run below |
 | Physical USB bridge and native USB Serial/JTAG on either module | NOT RUN; no board attached |
-| Real default/custom wiring, PWM behavior, supply, restart/power loss and OTA | NOT RUN; stable release blocked pending hardware acceptance |
+| Real default/custom wiring, PWM behavior, supply, restart/power loss and OTA | NOT RUN; outstanding physical acceptance, see stable authorization above |
 | Windows/Linux real USB, browser serial pairing | NOT RUN; CI unit tests do not cover this |
 | Stable firmware release or hosted installer deployment | NOT PERFORMED |
 

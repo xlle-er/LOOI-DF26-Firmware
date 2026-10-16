@@ -43,3 +43,9 @@ struct ControlAuthority {
 // Bind the one-boot preference to the partition actually activated by OTA.
 constexpr uint32_t otaHotspotMarker(uint32_t address,bool close) { return (address & ~1u) | (close ? 1u : 0u); }
 constexpr bool suppressHotspotAfterOta(uint32_t marker,uint32_t running) { return marker && (marker & 1u) && (marker & ~1u)==running; }
+
+// openAp() may refresh the deadline after loop() samples now. Treat that
+// slightly older sample as pending, including across millis() rollover.
+constexpr bool hotspotGraceExpired(uint32_t now,uint32_t started) {
+  return int32_t(now-started)>=60000;
+}

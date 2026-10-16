@@ -1,8 +1,8 @@
 # LOOI DF26 Firmware
 
-> **2.1.0 预发布版**：新增持久化接线、N16R8/N8R8 和 USB 一键部署。首次升级后必须确认接线，否则电机保持禁用。兼容官方 OTA 保留接线；旧 2.0.x OTA 包将被拒绝。下面 2.0.2 说明保留作稳定版参考，2.1.0 的构建和安装以本节为准。
+> **2.1.0 正式版**：新增持久化接线、N16R8/N8R8 和 USB 一键部署。首次升级后必须确认接线，否则电机保持禁用。兼容官方 OTA 保留接线；旧 2.0.x OTA 包将被拒绝。下面 2.0.2 说明保留作历史参考，2.1.0 的构建和安装以本节为准。
 
-2.1.0 下载：[预发布版本](https://github.com/xlle-er/LOOI-DF26-Firmware/releases/tag/v2.1.0)。尚未完成真机验收，不替换稳定版推荐。Agent 安装时显式添加 `--release v2.1.0`。
+2.1.0 下载：[正式版本](https://github.com/xlle-er/LOOI-DF26-Firmware/releases/tag/v2.1.0)。稳定更新入口推荐此版本，Agent 默认 `latest` 可获取。已确认 N16R8 USB 应用烧录、启动与热点可见；其余真机验收范围见 VERIFICATION.md。
 
 使用 [LOOI-DF26-Skill](https://github.com/xlle-er/LOOI-DF26-Skill) 完成 Agent 部署。网页安装源码位于 `installer/`，本次尚未部署上线。`npm ci && npm run build` 生成 `installer/dist`，供后续静态托管；预定入口为 https://xlle-er.github.io/LOOI-DF26-Firmware/。
 
@@ -54,6 +54,8 @@ Flash Size 和分区必须配套。4MB 启动配置搭配 16MB 分区会导致�
 无有效网络时自动开启 `LOOI-Setup-XXXXXX` 热点；平时也可长按 BOOT **3 秒后松开**。不要同时按 RST。
 
 连接热点，打开 **http://192.168.4.1/**，用户名 **admin**，初始密码 **12345678**。密码位于 `LooiWifiOta.h` 的 `OTA_PASSWORD`，可在首次构建前修改。它是设备管理密码，不是路由器密码。
+
+设备已连接路由器时，手机/电脑连接同一局域网，使用设备状态中的 `ip` 打开 `http://<设备局域网IP>/`，即可上传本地固件；设备能访问互联网时也可在面板检查并安装在线版本，无需切换到 ESP 热点。`192.168.4.1` 仅用于连接 ESP 热点的场景。长按 BOOT 重新开启热点或延长已有热点的 60 秒窗口；串口的 `[AP]` 日志会报告启动地址或失败原因。
 
 面板可扫描 2.4 GHz 网络、填写隐藏 SSID、连接和忘记网络。连接成功后保存凭据，热点保留 60 秒；连接失败保留热点，不覆盖旧配置。路由器断开后恢复热点入口。局域网通过 `_looi._tcp` 发现，设备名和稳定 ID 为 `looi-<MAC>`。
 

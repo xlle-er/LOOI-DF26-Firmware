@@ -21,5 +21,20 @@ int main(){
  assert(!suppressHotspotAfterOta(otaHotspotMarker(0x310000,true),0x10000));
  assert(!suppressHotspotAfterOta(otaHotspotMarker(0x310000,false),0x310000));
  assert(!suppressHotspotAfterOta(0,0x310000));
+ // BOOT starts AP later than the loop's timestamp: unsigned subtraction
+ // previously looked like a 49-day timeout and closed AP immediately.
+ assert(!hotspotGraceExpired(1000,1001));
+ assert(!hotspotGraceExpired(1001,1001));
+ assert(!hotspotGraceExpired(61000,1001));
+ assert(hotspotGraceExpired(61001,1001));
+ // Reopening an active AP refreshes its window; zero is a valid start time.
+ assert(!hotspotGraceExpired(61001,60000));
+ assert(!hotspotGraceExpired(59999,0));
+ assert(hotspotGraceExpired(60000,0));
+ constexpr uint32_t apStart=0xfffffff0u;
+ assert(!hotspotGraceExpired(0xffffffefu,apStart));
+ assert(!hotspotGraceExpired(uint32_t(apStart+59999u),apStart));
+ assert(hotspotGraceExpired(uint32_t(apStart+60000u),apStart));
+ std::puts("PASS: hotspot stale timestamp, renewed grace window, exact timeout and clock wrap");
  std::puts("PASS: all mapping combinations, independent shortcuts, takeover, stale-token rejection, lease expiry and clock wrap");
 }
