@@ -1,0 +1,41 @@
+#pragma once
+#include <stdint.h>
+struct MotorMapping {
+  bool leftInvert = true;
+  bool rightInvert = false;
+  bool swap = false;
+  void reverseForward() { leftInvert = !leftInvert; rightInvert = !rightInvert; swap = !swap; }
+  void reverseSteering() { swap = !swap; }
+  void apply(float &left, float &right) const {
+    if (swap) { float t = left; left = right; right = t; }
+    if (leftInvert) left = -left;
+    if (rightInvert) right = -right;
+  }
+};
+// Wrap-safe, fixed-size ownership state, shared by HTTP and BLE.
+struct ControlLease {
+  uint32_t expires = 0;
+  bool owned = false;
+  bool expired(uint32_t now) const { return owned && int32_t(now - expires) >= 0; }
+  void renew(uint32_t now) { owned = true; expires = now + 1000; }
+  void release() { owned = false; }
+};
+#include <string>
+struct ControlAuthority {
+  std::string owner;
+  uint32_t token=0;
+  ControlLease lease;
+  bool expired(uint32_t now) const { return lease.expired(now); }
+  void revoke() { ++token; owner.clear(); lease.release(); }
+  bool acquire(const char *source,bool takeover,uint32_t now) {
+    if(expired(now))revoke();
+    if(!owner.empty()&&owner!=source&&!takeover)return false;
+    revoke();owner=source;lease.renew(now);return true;
+  }
+  bool allow(const char *source,uint32_t supplied,uint32_t now) {
+    if(expired(now))revoke();
+    if(owner.empty()&&std::string(source)=="ble")acquire(source,false,now);
+    if(owner!=source || (owner!="ble"&&supplied!=token))return false;
+    lease.renew(now);return true;
+  }
+};

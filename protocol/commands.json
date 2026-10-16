@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "chip": "ESP32-S3",
+  "commands": [
+    "motion",
+    "stop",
+    "ping",
+    "config_get",
+    "config_update",
+    "device_status",
+    "wifi_scan",
+    "wifi_configure",
+    "wifi_forget",
+    "calibration_get",
+    "calibration_set",
+    "calibration_test",
+    "control_acquire",
+    "control_renew",
+    "control_release",
+    "ota_start",
+    "ota_exit",
+    "ota_status",
+    "firmware_check",
+    "firmware_install"
+  ]
+}
