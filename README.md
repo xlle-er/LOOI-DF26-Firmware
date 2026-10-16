@@ -134,3 +134,8 @@ npm run build
 ```
 
 `Prepare installer site` workflow 仅手动准备站点 artifact，不部署。输入已验收的 release_tag 时下载并校验该 Release 的两套资源；留空只构建 UI。正式上线需单独配置 Pages/静态托管并发布对应 Release；本次不执行。
+
+
+### 预览版通道维护
+
+客户端和设备面板的“预览版更新”默认关闭；开启后读取 `releases/download/preview/` 的对应板型清单。每次已校验的版本正式公开为 prerelease 后运行 `python3 scripts/prepare-preview-channel.py`，将生成的 `dist/preview/*-manifest.json` 上传到独立、标记为 prerelease 的 `preview` Release。只更新清单指针，应用 URL 保持指向不可变版本标签；不要将 preview 设为 latest。发布版本和更新 preview 指针是两个独立步骤。

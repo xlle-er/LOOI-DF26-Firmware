@@ -9,11 +9,13 @@ This section describes the new persistent-wiring implementation, not a stable re
 | NVS/otadata addresses and dual 3 MB app slots on both layouts | PASS, inspected generated partition tables |
 | Firmware policy / scanner / actual JSON parser + NVS persistence fake, both profiles | PASS |
 | Corrupt/missing profiles, invalid GPIO types, reserved/duplicate pins, write failure, NVS unavailable | PASS in host tests; output initialization also gated in firmware |
-| Agent Python deployment tests | PASS, 8 tests; real device transport not exercised |
+| Agent Python deployment tests | PASS, 9 tests; real device transport not exercised |
 | Installer protocol, partition preflight, write/readback and USB stream tests | PASS, 9 tests |
-| DF26 browser/client/bridge tests, including 8 MB packages and old-image rejection | PASS, 10 tests |
-| Swift native and remote tests | PASS, 82 native + 24 remote checks |
+| DF26 browser/client/bridge tests, including 8 MB packages and old-image rejection | PASS, 11 tests |
+| Swift native and remote tests | PASS, 86 native + 24 remote checks |
 | Swift Wi-Fi management/cache typecheck | PASS |
+| Signed local iOS project + public GitHub iOS project, full device compilation | PASS with CODE_SIGNING_ALLOWED=NO; signed project settings unchanged and OTA source modules match |
+| Preview toggles / cache opt-in / channel switching | PASS in web + panel UI fixtures and client unit tests; default stable, cached preview blocked when off |
 | Android debug unit tests, JDK 21 | PASS; Kotlin application and test sources compiled |
 | Installer production build / dependency audit | PASS, no reported npm vulnerabilities at verification time |
 | Rendered installer via Codex IAB | PASS: nonblank, Chinese/English, custom GPIO editing, confirmation reset, guard message, no relevant console warnings/errors |
@@ -25,7 +27,7 @@ This section describes the new persistent-wiring implementation, not a stable re
 
 Commands: `python3 tests/contracts.py`; `scripts/build.sh`; `npm test && npm run build` in installer; Python unittest discovery in LOOI-DF26-Skill; DF26 `node --test tests/device.test.js`; iOS `scripts/test-native.py` and Swift Wi-Fi typecheck; Android `:app:testDebugUnitTest` using JDK 21. Generated binaries are ignored in dist/, and installer firmware assets are staged in ignored public/firmware/ for same-origin serving.
 
-Agent tool source and CI: https://github.com/xlle-er/LOOI-DF26-Skill/actions/runs/38881380393 . Firmware source and 2.1.0 prerelease assets are published separately from the stable feed; companion-client edits remain local for review.
+Agent tool source and CI: https://github.com/xlle-er/LOOI-DF26-Skill/actions/runs/38881380393 . Firmware source and 2.1.0 prerelease assets are published separately from the stable feed; companion-client sources are synchronized to their repositories; local private signing settings are not published.
 
 # 验证记录 / Verification
 

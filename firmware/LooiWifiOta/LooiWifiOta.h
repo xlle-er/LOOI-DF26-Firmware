@@ -157,8 +157,8 @@ class LooiWifiOta {
       if(!otaMode_) { revoke(); otaMode_=true; } status(reply);
     }
     else if(type=="ota_exit") { if(writing_) reject("Upload in progress"); else { otaMode_=false; revoke(); } }
-    else if(type=="firmware_check") { revoke(); if(!fetchManifest(reply)) reject(error_); }
-    else if(type=="firmware_install") { closeApAfterUpdate_=root["close_ap_after_update"] | true; revoke(); otaMode_=true; if(!installRelease(root["version"] | "")) { otaMode_=false; reject(error_); } else reply["restarting"]=true; }
+    else if(type=="firmware_check") { revoke(); String channel=root["channel"] | "stable"; if(!validChannel(channel)) reject("Unknown update channel"); else if(!fetchManifest(reply,channel)) reject(error_); }
+    else if(type=="firmware_install") { closeApAfterUpdate_=root["close_ap_after_update"] | true; revoke(); otaMode_=true; String channel=root["channel"] | "stable"; if(!validChannel(channel)) { otaMode_=false; reject("Unknown update channel"); } else if(!installRelease(root["version"] | "",channel)) { otaMode_=false; reject(error_); } else reply["restarting"]=true; }
     return true;
   }
  private:
@@ -274,19 +274,20 @@ class LooiWifiOta {
     }
     error_="Too many release redirects";return false;
   }
-  bool fetchManifest(JsonDocument &result) {
+  bool validChannel(const String &channel) { return channel=="stable" || channel=="preview"; }
+  bool fetchManifest(JsonDocument &result,const String &channel="stable") {
     if(WiFi.status()!=WL_CONNECTED){error_="Connect ESP to Wi-Fi before checking online releases";return false;}
     // Certificate verification requires a valid clock; never disable TLS verification.
     if(time(nullptr)<1700000000){configTime(0,0,"pool.ntp.org","time.cloudflare.com");error_="Synchronizing clock; retry in a few seconds";return false;}
     HTTPClient http;NetworkClientSecure client;
-    if(!getHttps(String("https://github.com/xlle-er/LOOI-DF26-Firmware/releases/latest/download/")+MANIFEST_ASSET,http,client))return false;
+    if(!getHttps(String("https://github.com/xlle-er/LOOI-DF26-Firmware/releases/")+(channel=="preview"?"download/preview/":"latest/download/")+MANIFEST_ASSET,http,client))return false;
     if(http.getSize()>8192){http.end();error_="Release manifest too large";return false;}
     String body=http.getString();http.end();StaticJsonDocument<8192> manifest;
     if(body.length()>8192||deserializeJson(manifest,body)||manifest["chip"]!="ESP32-S3"||manifest["partition"]!=HARDWARE_PARTITION||manifest["board"]!=HARDWARE_BOARD||manifest["hardware_protocol"]!=1||!trustedUrl(manifest["url"]|"")) {error_="Incompatible release manifest";return false;}
-    result["release"]=manifest.as<JsonObjectConst>();return true;
+    manifest["channel"]=channel; result["release"]=manifest.as<JsonObjectConst>();return true;
   }
-  bool installRelease(const String &version) {
-    StaticJsonDocument<8192> result;if(!fetchManifest(result))return false;JsonObjectConst release=result["release"];
+  bool installRelease(const String &version,const String &channel="stable") {
+    StaticJsonDocument<8192> result;if(!fetchManifest(result,channel))return false;JsonObjectConst release=result["release"];
     if(version.isEmpty()||version!=String(release["version"]|"")){error_="Release changed; check version again";return false;}
     HTTPClient http;NetworkClientSecure client;if(!getHttps(release["url"]|"",http,client))return false;
     size_t size=release["size"]|0; if(http.getSize()!=int(size)||!startUpdate(size,release["sha256"]|"")){http.end();return false;}

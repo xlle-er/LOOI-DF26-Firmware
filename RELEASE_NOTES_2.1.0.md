@@ -18,3 +18,10 @@
 - 从 2.0.2 升级后，先打开设备面板核对并保存六个电机 GPIO，重启后才能运行。旧自定义接线必须重新填写。
 - `looi-installer-2.1.0.zip` 是可静态托管的安装站点，含同源固件资产；下载后需通过 localhost 或 HTTPS 提供页面。此发布不代表已部署在线安装站点。
 - 固件与工具已通过软件测试、双规格编译和三系统工具 CI；真实 USB、电机、供电和断电 OTA 均未完成验收，因此发布为预发布版本。稳定版 latest 保持 2.0.2。
+
+
+## 预览版 OTA 开关
+
+网页、iOS、Android 和设备面板均加入默认关闭的“预览版更新”开关；检查和安装明确选择 stable/preview 通道，保存的固件带通道标签。关闭后禁止上传缓存的预览包。预览通道由单独的 `preview` 预发布维护清单，下载仍指向具体版本，不改变稳定版 latest。
+
+The preview OTA toggle is off by default across web, iOS, Android and the embedded panel. Cached previews require opt-in again before installation. Local signed iOS project sources are synchronized with the public iOS repository; private signing settings are unchanged.

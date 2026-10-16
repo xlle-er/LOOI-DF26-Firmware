@@ -64,3 +64,8 @@ USB UART0 (115200) and native Serial/JTAG use newline-delimited JSON with string
 Pin order is ENA, IN1, IN2, IN3, IN4, ENB; A is left, B is right. All must be distinct integers from the board profile's allowed subset. GPIO38/48 (board LEDs), straps, UART0, native USB and memory pins are reserved. This profile covers DevKitC-1-compatible layouts, not every board carrying an N16R8/N8R8 module.
 
 OTA applications embed `LOOI_HW_V1|BOARD|1|PARTITION|END`, checked across streaming upload chunks before activating the new application. Missing/mismatched descriptors, including 2.0.x packages, are rejected. This is compatibility metadata, not a cryptographic signature. N16R8 keeps the legacy manifest URL; N8R8 uses `looi-s3-n8r8-manifest.json`. Local-file uploads follow the same device-side policy. Clients remember the last connected board for offline downloads; connect once to an N8R8 device before preparing its first offline package.
+
+
+### OTA update channels
+
+`firmware_check` and `firmware_install` accept `channel: "stable" | "preview"`, default `stable`; installation must supply the same channel as the preceding check. Unknown channels are rejected. Stable uses the existing latest/download manifest; preview uses releases/download/preview/ with the same per-board manifest names. The rolling `preview` release is marked prerelease and contains only channel pointers to immutable version-tagged application URLs. The device always enforces profile compatibility, HTTPS, size and SHA-256 regardless of channel. Local-file OTA is an explicit selection outside this online-channel preference.
