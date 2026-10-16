@@ -1,0 +1,40 @@
+name: Prepare installer site (no deployment)
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Validated release tag with both board USB assets (leave blank to build UI only)'
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: installer/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download validated release assets
+        if: inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir /tmp/looi-release
+      - name: Verify and stage same-origin firmware
+        if: inputs.release_tag != ''
+        run: python scripts/prepare-installer.py --assets /tmp/looi-release --require-all
+      - run: npm ci
+        working-directory: installer
+      - run: npm test && npm run build
+        working-directory: installer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: looi-installer-site
+          path: installer/dist

@@ -46,3 +46,21 @@ Uploads include `X-Firmware-Size` and lowercase hexadecimal `X-Firmware-SHA256`.
 ### Post-update hotspot option (2.0.1+)
 
 `ota_start` and `firmware_install` accept optional boolean `close_ap_after_update` (default `true`). Status reports `ota_ap_shutdown_supported`, `close_ap_after_update` and `ap_suppressed_after_ota`. The selection is bound to the OTA target partition and consumed on the following boot. Failed/incomplete OTA must not suppress the original partition's hotspot; BOOT explicitly reopens it. Prior versions require manually leaving the hotspot. This option never chooses the phone's internet connection.
+
+## Hardware configuration protocol v1 (firmware 2.1.0+)
+
+`hardware_get` returns normal device identity/status plus `hardware_profile`, `hardware_configured`, `hardware_ready`, `hardware_error`, `hardware_protocol: 1`, `flash_mb`, `physical_flash_bytes`, `psram_bytes` and `partition`. An unconfigured profile has an empty `pins` object and `hardware_ready: false`. Board names are `n16r8` and `n8r8`.
+
+`hardware_set` takes a complete `hardware_profile`:
+
+```json
+{"type":"hardware_set","id":"unique-request-id","hardware_profile":{"version":1,"board":"n16r8","pins":{"ena":17,"in1":16,"in2":15,"in3":7,"in4":6,"enb":5}}}
+```
+
+HTTP uses existing Basic/CSRF authentication; BLE and USB mutations require `admin_password`. Changes revoke control and stop before saving. An accepted write replies with `restarting: true`, then reboots after 1.5 seconds. Never infer the new active profile from the acknowledgement: reconnect, read it back and require `hardware_ready: true`. Failed writes preserve the previous NVS blob; active mapping never changes before reboot.
+
+USB UART0 (115200) and native Serial/JTAG use newline-delimited JSON with string IDs up to 80 bytes and requests up to 2048 bytes. Only `hardware_get`, `hardware_set`, `device_status` are accepted. Ignore boot log lines and correlate reply IDs; errors are `{type:"error",accepted:false,message:...}`. No USB motion or Wi-Fi credentials commands exist. Changing passwords still follows the existing firmware management policy.
+
+Pin order is ENA, IN1, IN2, IN3, IN4, ENB; A is left, B is right. All must be distinct integers from the board profile's allowed subset. GPIO38/48 (board LEDs), straps, UART0, native USB and memory pins are reserved. This profile covers DevKitC-1-compatible layouts, not every board carrying an N16R8/N8R8 module.
+
+OTA applications embed `LOOI_HW_V1|BOARD|1|PARTITION|END`, checked across streaming upload chunks before activating the new application. Missing/mismatched descriptors, including 2.0.x packages, are rejected. This is compatibility metadata, not a cryptographic signature. N16R8 keeps the legacy manifest URL; N8R8 uses `looi-s3-n8r8-manifest.json`. Local-file uploads follow the same device-side policy. Clients remember the last connected board for offline downloads; connect once to an N8R8 device before preparing its first offline package.

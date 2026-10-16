@@ -1,0 +1,4 @@
+node_modules/
+dist/
+public/firmware/
+public/firmware-stage-*/

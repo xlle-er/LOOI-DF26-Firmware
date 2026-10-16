@@ -1,6 +1,7 @@
 from pathlib import Path
 import json,re,subprocess,sys,tempfile
 root=Path(__file__).resolve().parents[1]
+subprocess.run([sys.executable,str(root/'scripts/sync-hardware.py'),'--check'],check=True)
 commands=json.loads((root/'protocol/commands.json').read_text())['commands']
 ino=(root/'firmware/LooiWifiOta/LooiWifiOta.ino').read_text()
 header=(root/'firmware/LooiWifiOta/LooiWifiOta.h').read_text()
@@ -24,4 +25,26 @@ with tempfile.TemporaryDirectory() as tmp:
  binary=Path(tmp)/'policy-test'
  subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror',str(root/'firmware/LooiWifiOta/tests/policy_test.cpp'),'-o',str(binary)],check=True)
  subprocess.run([str(binary)],check=True)
+for flash in (8,16):
+ with tempfile.TemporaryDirectory() as tmp:
+  binary=Path(tmp)/'hardware-test'
+  subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror',f'-DLOOI_FLASH_MB={flash}',str(root/'firmware/LooiWifiOta/tests/hardware_test.cpp'),'-o',str(binary)],check=True)
+  subprocess.run([str(binary)],check=True)
+# Compile real persistence/parser logic against an in-memory NVS fake.
+arduino_json=Path.home()/'Documents/Arduino/libraries/ArduinoJson/src'
+if arduino_json.exists():
+ for flash in (8,16):
+  with tempfile.TemporaryDirectory() as tmp:
+   binary=Path(tmp)/'storage-test'
+   subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror',f'-DLOOI_FLASH_MB={flash}','-I'+str(root/'firmware/LooiWifiOta/tests/fakes'),'-I'+str(arduino_json),str(root/'firmware/LooiWifiOta/tests/storage_test.cpp'),'-o',str(binary)],check=True)
+   subprocess.run([str(binary)],check=True)
+else: print('SKIP: storage/parser test requires ArduinoJson include headers')
+boards=json.loads((root/'hardware/boards.json').read_text())
+assert json.loads((root/'installer/boards.json').read_text())==boards
+skill_boards=workspace/'LOOI-DF26-Skill/looi_deploy/boards.json'
+if skill_boards.exists():assert json.loads(skill_boards.read_text())==boards
+# C++/Python/JS pin rules derive the same conservative board subset.
+allowed=[1,2,*range(4,19),21,*range(39,43),47]
+assert all(b['allowed_gpio']==allowed for b in boards.values())
+assert 'nvs_flash_erase' not in ino
 print('PASS: firmware/client command parity, no obsolete actuator paths, release destination and policy')

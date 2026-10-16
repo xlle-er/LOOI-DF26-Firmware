@@ -1,3 +1,32 @@
+## 2.1.0 development verification — 2026-10-16
+
+This section describes the new persistent-wiring implementation, not a stable release or hardware certification.
+
+| Check | Result |
+| --- | --- |
+| N16R8 and N8R8 builds, Arduino ESP32 3.3.12 | PASS, both applications below 3 MB |
+| Exact build source snapshot and segmented USB asset SHA-256 | PASS |
+| NVS/otadata addresses and dual 3 MB app slots on both layouts | PASS, inspected generated partition tables |
+| Firmware policy / scanner / actual JSON parser + NVS persistence fake, both profiles | PASS |
+| Corrupt/missing profiles, invalid GPIO types, reserved/duplicate pins, write failure, NVS unavailable | PASS in host tests; output initialization also gated in firmware |
+| Agent Python deployment tests | PASS, 8 tests; real device transport not exercised |
+| Installer protocol, partition preflight, write/readback and USB stream tests | PASS, 9 tests |
+| DF26 browser/client/bridge tests, including 8 MB packages and old-image rejection | PASS, 10 tests |
+| Swift native and remote tests | PASS, 82 native + 24 remote checks |
+| Swift Wi-Fi management/cache typecheck | PASS |
+| Android debug unit tests, JDK 21 | PASS; Kotlin application and test sources compiled |
+| Installer production build / dependency audit | PASS, no reported npm vulnerabilities at verification time |
+| Rendered installer via Codex IAB | PASS: nonblank, Chinese/English, custom GPIO editing, confirmation reset, guard message, no relevant console warnings/errors |
+| Cross-platform Agent CI | PASS, all 6 jobs: macOS/Windows/Linux × Python 3.10/3.12; see linked run below |
+| Physical USB bridge and native USB Serial/JTAG on either module | NOT RUN; no board attached |
+| Real default/custom wiring, PWM behavior, supply, restart/power loss and OTA | NOT RUN; stable release blocked pending hardware acceptance |
+| Windows/Linux real USB, browser serial pairing | NOT RUN; CI unit tests do not cover this |
+| Stable firmware release or hosted installer deployment | NOT PERFORMED |
+
+Commands: `python3 tests/contracts.py`; `scripts/build.sh`; `npm test && npm run build` in installer; Python unittest discovery in LOOI-DF26-Skill; DF26 `node --test tests/device.test.js`; iOS `scripts/test-native.py` and Swift Wi-Fi typecheck; Android `:app:testDebugUnitTest` using JDK 21. Generated binaries are ignored in dist/, and installer firmware assets are staged in ignored public/firmware/ for same-origin serving.
+
+Agent tool source and CI: https://github.com/xlle-er/LOOI-DF26-Skill/actions/runs/38881380393 . Firmware source and 2.1.0 prerelease assets are published separately from the stable feed; companion-client edits remain local for review.
+
 # 验证记录 / Verification
 
 日期 / Date: 2026-10-16

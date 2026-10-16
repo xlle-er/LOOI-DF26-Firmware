@@ -16,22 +16,24 @@ bool capturingHttp = false;
 void stopForDevice();
 String executeDeviceCommand(const String &json, const String &source);
 void testDeviceWheels(float left, float right);
+void processUsbManagement();
+bool nvsHealthy=false;
+bool motorPinsReady=false;
 
 // This firmware intentionally contains no AI, personality, or Life
 // Engine logic. The phone/server side will decide high-level intent later.
 // The ESP32 is only the final motor safety layer that executes short, clamped
 // motion commands and automatically stops.
 
-// Placeholder motor pins for the current L298N test setup.
-// Update these if your wiring changes.
-constexpr uint8_t LEFT_IN1 = 16;
-constexpr uint8_t LEFT_IN2 = 15;
-constexpr uint8_t LEFT_EN = 17;
+// Loaded only from a validated persistent hardware profile, before GPIO initialization.
+uint8_t LEFT_IN1 = 0;
+uint8_t LEFT_IN2 = 0;
+uint8_t LEFT_EN = 0;
 constexpr uint8_t LEFT_PWM_CHANNEL = 0;
 
-constexpr uint8_t RIGHT_IN1 = 7;
-constexpr uint8_t RIGHT_IN2 = 6;
-constexpr uint8_t RIGHT_EN = 5;
+uint8_t RIGHT_IN1 = 0;
+uint8_t RIGHT_IN2 = 0;
+uint8_t RIGHT_EN = 0;
 constexpr uint8_t RIGHT_PWM_CHANNEL = 1;
 
 // Preserve the established logical chassis orientation.
@@ -174,6 +176,10 @@ void sendJsonEvent(const TDoc &doc) {
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
+  Serial0.begin(SERIAL_BAUD);
+  nvsHealthy = nvs_flash_init() == ESP_OK;
+  wifiOta.hardware.load(nvsHealthy);
+  Serial.println(HARDWARE_DESCRIPTOR);
   delay(250);
 
   Serial.println();
@@ -181,7 +187,7 @@ void setup() {
   Serial.println("[BOOT] ESP32 will only execute short, safe motor commands");
 
   setupPins();
-  setupBle();
+  if(nvsHealthy) setupBle();
   stopMotors("boot");
   wifiOta.begin(stopForDevice, executeDeviceCommand, testDeviceWheels);
   Serial.println("[OTA] Hold BOOT for 3 seconds to enter Wi-Fi update mode");
@@ -191,6 +197,7 @@ void loop() {
   const uint32_t now = millis();
 
   if (bleStopRequested) { bleStopRequested=false; wifiOta.bleDisconnected(); }
+  processUsbManagement();
   wifiOta.loop();
   processPendingBleData();
   if (wifiOta.locked()) {
@@ -215,16 +222,26 @@ void loop() {
 }
 
 void setupPins() {
+  if(ESP.getFlashChipSize()!=LOOI_FLASH_MB*1024u*1024u || ESP.getPsramSize()!=8u*1024u*1024u) {
+    wifiOta.hardware.error="Physical Flash/PSRAM mismatch; motors disabled"; return;
+  }
+  if(!wifiOta.hardware.configured() || !nvsHealthy) return;
+  const auto &p=wifiOta.hardware.profile.pins;
+  LEFT_EN=p[0]; LEFT_IN1=p[1]; LEFT_IN2=p[2]; RIGHT_IN1=p[3]; RIGHT_IN2=p[4]; RIGHT_EN=p[5];
+  // Enables are held low before direction lines or PWM are initialized.
+  for(auto pin:p) { digitalWrite(pin,LOW); pinMode(pin,OUTPUT); }
   pinMode(LEFT_IN1, OUTPUT);
   pinMode(LEFT_IN2, OUTPUT);
   pinMode(RIGHT_IN1, OUTPUT);
   pinMode(RIGHT_IN2, OUTPUT);
 
-  if (!attachMotorPwm(LEFT_EN, LEFT_PWM_CHANNEL)) {
+  bool leftOk=attachMotorPwm(LEFT_EN, LEFT_PWM_CHANNEL);
+  bool rightOk=attachMotorPwm(RIGHT_EN, RIGHT_PWM_CHANNEL);
+  if (!leftOk) {
     Serial.println("[BOOT] Failed to attach left PWM pin");
   }
 
-  if (!attachMotorPwm(RIGHT_EN, RIGHT_PWM_CHANNEL)) {
+  if (!rightOk) {
     Serial.println("[BOOT] Failed to attach right PWM pin");
   }
 
@@ -235,7 +252,11 @@ void setupPins() {
   writeMotorPwm(LEFT_EN, LEFT_PWM_CHANNEL, 0);
   writeMotorPwm(RIGHT_EN, RIGHT_PWM_CHANNEL, 0);
 
-  Serial.println("[BOOT] Motor pins configured");
+  motorPinsReady=leftOk && rightOk;
+  wifiOta.hardware.ready=motorPinsReady;
+  wifiOta.hardware.error=motorPinsReady ? "" : "PWM initialization failed; motors disabled";
+  if(!motorPinsReady) { if(leftOk) ledcDetach(LEFT_EN); if(rightOk) ledcDetach(RIGHT_EN); digitalWrite(LEFT_EN,LOW); digitalWrite(RIGHT_EN,LOW); }
+  Serial.println("[BOOT] Motor initialization checked");
 }
 
 
@@ -355,17 +376,10 @@ void processPendingBleData() {
 void initializeNvsForBle() {
   esp_err_t result = nvs_flash_init();
 
-  if (result == ESP_ERR_NVS_NO_FREE_PAGES ||
-      result == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    Serial.printf("[BLE] NVS reset required before BLE init err=0x%x\n",
-                  static_cast<unsigned int>(result));
-    const esp_err_t eraseResult = nvs_flash_erase();
-    if (eraseResult != ESP_OK) {
-      Serial.printf("[BLE] NVS erase failed err=0x%x\n",
-                    static_cast<unsigned int>(eraseResult));
-      return;
-    }
-    result = nvs_flash_init();
+  if (result != ESP_OK) {
+    nvsHealthy=false; wifiOta.hardware.ready=false;
+    wifiOta.hardware.error="NVS unavailable; motors disabled; USB recovery required";
+    stopForDevice(); return;
   }
 
   if (result == ESP_OK) {
@@ -933,6 +947,7 @@ void updateRampedMotion(bool force) {
 
 
 void applyMotorSpeeds(float leftSpeed, float rightSpeed) {
+  if(!motorPinsReady) { currentLeftSpeed=currentRightSpeed=0; return; }
   currentLeftSpeed = applyDeadband(clampSpeed(leftSpeed));
   currentRightSpeed = applyDeadband(clampSpeed(rightSpeed));
 
@@ -1203,4 +1218,29 @@ void testDeviceWheels(float left, float right) {
   startLeftSpeed = targetLeftSpeed = left;
   startRightSpeed = targetRightSpeed = right;
   updateRampedMotion(true);
+}
+
+// Local physical USB management only; motion is deliberately excluded.
+void readUsbLine(Stream &port, String &buffer, bool &overflow, const char *source) {
+  for(size_t budget=0;budget<256 && port.available();++budget) {
+    char ch=char(port.read());
+    if(ch=='\r') continue;
+    if(ch!='\n') { if(buffer.length()<2048 && !overflow) buffer+=ch; else { overflow=true; buffer=""; } continue; }
+    if(overflow) { overflow=false; buffer=""; continue; }
+    JsonDocument request,reply;
+    if(deserializeJson(request,buffer) || !request.is<JsonObject>()) { buffer=""; continue; }
+    buffer="";
+    if(!request["id"].is<const char *>() || strlen(request["id"].as<const char *>())>80) continue;
+    String type=request["type"] | "";
+    if(type!="hardware_get" && type!="hardware_set" && type!="device_status") {
+      reply["id"]=request["id"]; reply["type"]="error"; reply["accepted"]=false; reply["message"]="USB supports hardware management only";
+    } else wifiOta.handle(request.as<JsonObjectConst>(),reply,source);
+    serializeJson(reply,port); port.println(); port.flush();
+  }
+}
+void processUsbManagement() {
+  static String nativeBuffer,uartBuffer;
+  static bool nativeOverflow=false,uartOverflow=false;
+  readUsbLine(Serial,nativeBuffer,nativeOverflow,"usb:native");
+  readUsbLine(Serial0,uartBuffer,uartOverflow,"usb:uart");
 }

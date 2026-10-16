@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "chip": "ESP32-S3",
   "commands": [
     "motion",
@@ -21,6 +21,8 @@
     "ota_exit",
     "ota_status",
     "firmware_check",
-    "firmware_install"
+    "firmware_install",
+    "hardware_get",
+    "hardware_set"
   ]
 }
