@@ -17,5 +17,9 @@ int main(){
  c.revoke();assert(!c.allow("http:phone",old,50));assert(c.acquire("http:phone",false,60));assert(!c.allow("http:phone",old,70));
  assert(c.allow("http:phone",c.token,70));assert(c.expired(1070));assert(!c.allow("http:phone",c.token,1071));
  assert(c.acquire("http:phone",false,0xffffff00));assert(!c.expired(0x100));assert(c.expired(0x400));
+ assert(suppressHotspotAfterOta(otaHotspotMarker(0x310000,true),0x310000));
+ assert(!suppressHotspotAfterOta(otaHotspotMarker(0x310000,true),0x10000));
+ assert(!suppressHotspotAfterOta(otaHotspotMarker(0x310000,false),0x310000));
+ assert(!suppressHotspotAfterOta(0,0x310000));
  std::puts("PASS: all mapping combinations, independent shortcuts, takeover, stale-token rejection, lease expiry and clock wrap");
 }

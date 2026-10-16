@@ -15,7 +15,7 @@
 #include "DevicePanel.h"
 
 constexpr char OTA_PASSWORD[] = "12345678";
-constexpr char DEVICE_VERSION[] = "2.0.0";
+constexpr char DEVICE_VERSION[] = "2.0.1";
 constexpr char RELEASE_MANIFEST[] = "https://github.com/xlle-er/LOOI-DF26-Firmware/releases/latest/download/looi-s3-manifest.json";
 
 class LooiWifiOta {
@@ -32,10 +32,14 @@ class LooiWifiOta {
       Settings loaded; prefs_.getBytes("settings", &loaded, sizeof(loaded));
       if (loaded.version == 2 && loaded.ssid[32] == 0 && loaded.password[64] == 0) settings_ = loaded;
     }
+    const auto running=esp_ota_get_running_partition();
+    const uint32_t marker=prefs_.getUInt("ota_ap_once",0);
+    autoApSuppressed_=running && suppressHotspotAfterOta(marker,running->address);
+    if(marker) prefs_.remove("ota_ap_once");
     configureRoutes(); server_.begin();
     WiFi.persistent(false); WiFi.mode(WIFI_STA); WiFi.setHostname(id_.c_str());
     if (settings_.ssid[0]) connect(settings_.ssid, settings_.password, false);
-    else openAp();
+    else if(!autoApSuppressed_) openAp();
     Serial.printf("[DEVICE] %s version=%s hold BOOT 3s for setup\n",id_.c_str(),DEVICE_VERSION);
   }
   void bleDisconnected() { if(authority_.owner=="ble") revoke(); }
@@ -77,8 +81,8 @@ class LooiWifiOta {
       if(!offlineAt_) offlineAt_=now;
       if(connecting_ && now-connectAt_>=30000) {
         connecting_=false; networkState_="failed"; error_="Wi-Fi connection failed; check name/password and 2.4 GHz support";
-        pendingPassword_=""; candidate_=false; WiFi.disconnect(false,false); openAp();
-      } else if(!connecting_ && now-offlineAt_>=15000 && !ap_) { revoke(); openAp(); if(settings_.ssid[0]) connect(settings_.ssid,settings_.password,false); }
+        pendingPassword_=""; candidate_=false; WiFi.disconnect(false,false); if(!autoApSuppressed_) openAp();
+      } else if(!autoApSuppressed_ && !connecting_ && now-offlineAt_>=15000 && !ap_) { revoke(); openAp(); if(settings_.ssid[0]) connect(settings_.ssid,settings_.password,false); }
     }
     server_.handleClient();
     if(writing_ && millis()-lastWrite_>15000) { fail("Upload timed out"); uploadRequest_=false; }
@@ -133,10 +137,15 @@ class LooiWifiOta {
         else { reject("Unknown test direction"); return true; }
         test_(l,r); reply["duration_ms"]=300;
       }
-    } else if(type=="ota_start") { if(!otaMode_) { revoke(); otaMode_=true; } status(reply); }
+    } else if(type=="ota_start") {
+      if(writing_) { reject("Upload in progress"); return true; }
+      if(!root["close_ap_after_update"].isNull()&&!root["close_ap_after_update"].is<bool>()) { reject("Boolean hotspot option required"); return true; }
+      closeApAfterUpdate_=root["close_ap_after_update"] | true;
+      if(!otaMode_) { revoke(); otaMode_=true; } status(reply);
+    }
     else if(type=="ota_exit") { if(writing_) reject("Upload in progress"); else { otaMode_=false; revoke(); } }
     else if(type=="firmware_check") { revoke(); if(!fetchManifest(reply)) reject(error_); }
-    else if(type=="firmware_install") { revoke(); otaMode_=true; if(!installRelease(root["version"] | "")) { otaMode_=false; reject(error_); } else reply["restarting"]=true; }
+    else if(type=="firmware_install") { closeApAfterUpdate_=root["close_ap_after_update"] | true; revoke(); otaMode_=true; if(!installRelease(root["version"] | "")) { otaMode_=false; reject(error_); } else reply["restarting"]=true; }
     return true;
   }
  private:
@@ -150,16 +159,18 @@ class LooiWifiOta {
   size_t expected_=0,received_=0; String expectedSha_;
   mbedtls_sha256_context sha_;
   bool hashStarted_=false;
+  bool autoApSuppressed_=false,closeApAfterUpdate_=true;
   bool persist(const Settings &next) { if(prefs_.putBytes("settings",&next,sizeof(next))!=sizeof(next)) return false; settings_=next; return true; }
   void connect(const String &ssid,const String &password,bool candidate) {
     pendingSsid_=ssid; pendingPassword_=password; candidate_=candidate; connecting_=true; connectAt_=millis(); connectedAt_=0; error_=""; networkState_="connecting";
     WiFi.begin(ssid.c_str(),password.c_str());
   }
-  void openAp() { if(ap_) return; WiFi.mode(WIFI_AP_STA); ap_=WiFi.softAP(apName_.c_str(),OTA_PASSWORD,1,false,4); if(!ap_) error_="Could not start hotspot"; connectedAt_=WiFi.status()==WL_CONNECTED?millis():0; }
+  void openAp() { autoApSuppressed_=false; if(ap_) return; WiFi.mode(WIFI_AP_STA); ap_=WiFi.softAP(apName_.c_str(),OTA_PASSWORD,1,false,4); if(!ap_) error_="Could not start hotspot"; connectedAt_=WiFi.status()==WL_CONNECTED?millis():0; }
   void status(JsonDocument &doc) {
     doc["device_id"]=id_; doc["name"]="LOOI Body"; doc["firmware_version"]=DEVICE_VERSION; doc["chip"]="ESP32-S3";
     doc["network_state"]=networkState_; doc["connected"]=WiFi.status()==WL_CONNECTED;
     doc["ssid"]=WiFi.status()==WL_CONNECTED?WiFi.SSID():String(settings_.ssid); doc["ip"]=WiFi.localIP().toString();
+    doc["ota_ap_shutdown_supported"]=true; doc["close_ap_after_update"]=closeApAfterUpdate_; doc["ap_suppressed_after_ota"]=autoApSuppressed_;
     doc["ap_active"]=ap_; doc["ap_ssid"]=apName_; doc["ap_ip"]=WiFi.softAPIP().toString();
     doc["url"]=url(); doc["ota_mode"]=otaMode_; doc["ota_uploading"]=writing_; doc["error"]=error_; doc["control_owner"]=authority_.owner.c_str(); doc["control_token"]=authority_.token;
     auto map=doc.createNestedObject("calibration"); map["left_invert"]=settings_.mapping.leftInvert; map["right_invert"]=settings_.mapping.rightInvert; map["swap"]=settings_.mapping.swap;
@@ -204,7 +215,9 @@ class LooiWifiOta {
     uint8_t digest[32];mbedtls_sha256_finish(&sha_,digest);mbedtls_sha256_free(&sha_);hashStarted_=false;
     char hex[65];for(int i=0;i<32;i++)snprintf(hex+i*2,3,"%02x",digest[i]);
     if(expectedSha_!=hex){fail("SHA-256 mismatch");return false;}
-    if(!Update.end(false)){fail(Update.errorString());return false;}
+    const auto target=esp_ota_get_next_update_partition(nullptr);
+    if(!target||prefs_.putUInt("ota_ap_once",otaHotspotMarker(target->address,closeApAfterUpdate_))!=sizeof(uint32_t)) { fail("Could not save post-update hotspot option"); return false; }
+    if(!Update.end(false)){prefs_.remove("ota_ap_once");fail(Update.errorString());return false;}
     writing_=false;complete_=false;reboot_=true;rebootAt_=millis()+1500;return true;
   }
   void receiveUpload() {

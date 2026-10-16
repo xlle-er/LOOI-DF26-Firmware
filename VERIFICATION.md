@@ -31,3 +31,9 @@ Not yet tested on hardware: motor-only boot, BLE/Wi-Fi coexistence and switching
 `dist/looi-s3.bin`, `dist/looi-s3-manifest.json`, `dist/SHA256SUMS`, `dist/build-info.json`。构建信息记录源码和镜像校验值；dist 不提交到 Git。在线 OTA 必须在单独发布稳定 Release 并上传资产后才能使用。
 
 Build metadata records source and image checksums. The dist folder is excluded from Git. Online OTA becomes available after a maintainer separately publishes a stable Release with these assets.
+
+## 2.0.1 / Offline hotspot workflow verification
+
+2026-10-16: 已重新构建 16 MB / OPI / 双 3 MB 固件。新增目标分区绑定、默认关闭、用户选择保留热点和错误分区标记拒绝的策略检查。网页端 8 项测试通过；浏览器验证了无设备预下载、损坏包不覆盖缓存、刷新后持久化、离线上传期间零在线下载、默认开启开关与关闭选项、升级后恢复互联网提示及桌面/手机双语布局。Android 59 项测试与 Lint/APK 构建通过；iOS 81 项本机检查、24 项遥控检查和原签名项目模拟器构建通过。本轮均未进行真机 OTA 或真实手机切网。
+
+The package cache, offline upload, hotspot selection and AI internet reminders were verified with host tests and mocked browser device responses. Android/iOS builds passed. Physical OTA, hotspot shutdown and phone network recovery remain pending. The earlier 2.0.0 Release was published after the initial record above; 2.0.1 is authorized for publication in this update.

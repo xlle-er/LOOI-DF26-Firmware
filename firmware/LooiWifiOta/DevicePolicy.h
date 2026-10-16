@@ -39,3 +39,7 @@ struct ControlAuthority {
     lease.renew(now);return true;
   }
 };
+
+// Bind the one-boot preference to the partition actually activated by OTA.
+constexpr uint32_t otaHotspotMarker(uint32_t address,bool close) { return (address & ~1u) | (close ? 1u : 0u); }
+constexpr bool suppressHotspotAfterOta(uint32_t marker,uint32_t running) { return marker && (marker & 1u) && (marker & ~1u)==running; }

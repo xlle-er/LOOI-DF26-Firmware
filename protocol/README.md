@@ -42,3 +42,7 @@ All APIs require HTTP Basic `admin:<device password>`. Mutating requests require
 Successful management replies use `type=ack`, `cmd`, `accepted=true`; failures use `type=error`, `accepted=false`, `message`. Existing `config_get` and `ping` retain `config` and `pong` responses.
 
 Uploads include `X-Firmware-Size` and lowercase hexadecimal `X-Firmware-SHA256`. Firmware must fit the inactive 3 MB application partition. A successful update schedules reboot; reconnect and verify `firmware_version`. A failed upload can be retried or exited, and cannot resume old motor movement.
+
+### Post-update hotspot option (2.0.1+)
+
+`ota_start` and `firmware_install` accept optional boolean `close_ap_after_update` (default `true`). Status reports `ota_ap_shutdown_supported`, `close_ap_after_update` and `ap_suppressed_after_ota`. The selection is bound to the OTA target partition and consumed on the following boot. Failed/incomplete OTA must not suppress the original partition's hotspot; BOOT explicitly reopens it. Prior versions require manually leaving the hotspot. This option never chooses the phone's internet connection.

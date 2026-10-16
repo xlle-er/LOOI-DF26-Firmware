@@ -53,14 +53,14 @@ Flash Size 和分区必须配套。4MB 启动配置搭配 16MB 分区会导致�
 ./scripts/build.sh
 python3 tests/contracts.py
 # 使用已有构建目录准备资产（不会发布）：
-python3 scripts/package-release.py 2.0.0 /path/to/build-output
+python3 scripts/package-release.py 2.0.1 /path/to/build-output
 ```
 
 资产在根目录 `dist/`。实际发布需要维护者单独执行：
 
 ```sh
-gh release create v2.0.0 dist/looi-s3.bin dist/looi-s3-manifest.json dist/SHA256SUMS \
-  --repo xlle-er/LOOI-DF26-Firmware --title 'LOOI ESP32-S3 2.0.0' --notes-file RELEASE_NOTES.md
+gh release create v2.0.1 dist/looi-s3.bin dist/looi-s3-manifest.json dist/SHA256SUMS \
+  --repo xlle-er/LOOI-DF26-Firmware --title 'LOOI ESP32-S3 2.0.1' --notes-file RELEASE_NOTES_2.0.1.md
 ```
 
 本实现没有固件签名和启动失败自动回滚。请保留 USB 恢复途径。构建、主机模拟和客户端模拟测试不代表已通过真实电机、供电、Wi-Fi/BLE 共存和断电恢复验收。
@@ -82,3 +82,17 @@ Calibrate motor inversion and side mapping from any client. Shortcuts independen
 OTA accepts only ESP32-S3 application `.bin` images, validates size and SHA-256, locks motion and activates the new partition only after verification. Keep power connected. Online updates read the manifest link above from this repository's latest stable Release. Use the build and packaging commands above to prepare `dist/` assets; publishing is a separate maintainer action. Before a release is published, online checks report unavailable and local-file OTA remains usable.
 
 This version does not implement signed firmware or automatic rollback after a failed new application boot. Keep USB recovery available. Host tests and successful builds do not replace physical motor, power, wireless coexistence and interrupted-update testing. See [protocol documentation](protocol/README.md) for API details.
+
+## 热点升级与联网恢复 / Hotspot update and internet recovery
+
+先在有互联网时检查版本、下载并校验固件，再连接 ESP 热点上传。网页使用本机浏览器存储，App 使用自己的文件存储；已下载文件可在页面或 App 重启后继续使用。重新上传前再次校验，失败下载不会替换上一个完整包。
+
+“升级后关闭 ESP 热点”默认开启，需要设备固件 2.0.1 或更新版本支持。只有成功校验并切换到 OTA 目标分区后，下次启动才跳过自动开启热点；不会删除网络或方向设置，BLE 仍可用，长按 BOOT 3 秒可重新打开热点。该设置只影响升级后的这次启动，普通断电重启仍按原配网策略工作。关闭设备热点不保证手机自动恢复互联网，启动 AI 陪伴前应检查手机流量或可上网的 Wi-Fi。
+
+从仅热点 OTA 初版或 2.0.0 首次升级时，旧固件无法保存这个选项：先下载 `.bin`，再通过 `http://192.168.4.1/` 的设备面板上传，完成后手动断开热点。App/网页管理接口不保证兼容仅热点 OTA 初版。2.0.1 的关闭开关对安装该版本之后发起的 OTA 生效。
+
+Download and verify firmware while online, then join the ESP hotspot to upload. Prepared packages survive page/app restarts and are verified again before upload. Failed downloads preserve the last complete package.
+
+Close ESP hotspot after update is enabled by default and requires device firmware 2.0.1+. After a verified OTA activates its target partition, the next boot skips automatic hotspot startup. Network and calibration settings remain intact; BLE stays available and holding BOOT for three seconds reopens the hotspot. This is a one-boot choice; ordinary subsequent power cycles use normal provisioning behavior. Your phone decides whether internet reconnects automatically. Restore mobile data or internet Wi-Fi before AI companionship.
+
+The initial hotspot-only firmware and 2.0.0 cannot store this option. For the first upgrade, download the application `.bin`, join the hotspot and upload it through the device's own panel at `http://192.168.4.1/`, then leave the hotspot manually. Modern management APIs are not guaranteed on the initial firmware. The 2.0.1 option applies to OTA operations initiated after that firmware is installed.
