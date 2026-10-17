@@ -29,6 +29,10 @@ with tempfile.TemporaryDirectory() as tmp:
  binary=Path(tmp)/'identity-test'
  subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror',str(root/'firmware/LooiWifiOta/tests/identity_test.cpp'),'-o',str(binary)],check=True)
  subprocess.run([str(binary)],check=True)
+with tempfile.TemporaryDirectory() as tmp:
+ binary=Path(tmp)/'release-version-test'
+ subprocess.run(['clang++','-std=c++17','-Wall','-Wextra','-Werror',str(root/'firmware/LooiWifiOta/tests/release_version_test.cpp'),'-o',str(binary)],check=True)
+ subprocess.run([str(binary)],check=True)
 for flash in (8,16):
  with tempfile.TemporaryDirectory() as tmp:
   binary=Path(tmp)/'hardware-test'

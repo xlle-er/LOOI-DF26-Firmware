@@ -68,7 +68,7 @@ OTA applications embed `LOOI_HW_V1|BOARD|1|PARTITION|END`, checked across stream
 
 ### OTA update channels
 
-`firmware_check` and `firmware_install` accept `channel: "stable" | "preview"`, default `stable`; installation must supply the same channel as the preceding check. Unknown channels are rejected. Stable uses the existing latest/download manifest; preview uses releases/download/preview/ with the same per-board manifest names. The rolling `preview` release is marked prerelease and contains only channel pointers to immutable version-tagged application URLs. The device always enforces profile compatibility, HTTPS, size and SHA-256 regardless of channel. Local-file OTA is an explicit selection outside this online-channel preference.
+`firmware_check` and `firmware_install` accept `channel: "stable" | "preview"`, default `stable`; installation must supply the actual selected `release.channel` returned by the preceding check. Unknown channels are rejected. Stable uses the existing latest/download manifest; preview opt-in fetches both stable and releases/download/preview/ with the same per-board manifest names, chooses the higher semantic version, and prefers stable on equal precedence. Release versions outrank their prereleases; build metadata and publication timestamps cannot make an older version win. If one feed is unavailable or invalid, the other valid feed remains usable. The rolling `preview` release is marked prerelease and contains only channel pointers to immutable version-tagged application URLs. The device always enforces profile compatibility, HTTPS, size and SHA-256 regardless of channel. Local-file OTA is an explicit selection outside this online-channel preference.
 
 ## Device identity and asynchronous OTA (2.2.0+)
 

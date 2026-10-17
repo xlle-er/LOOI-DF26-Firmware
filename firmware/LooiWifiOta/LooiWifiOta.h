@@ -15,12 +15,13 @@
 #include "HardwareConfig.h"
 #include "DevicePanel.h"
 #include "DeviceIdentity.h"
+#include "ReleaseVersion.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
 constexpr char OTA_PASSWORD[] = "12345678";
-constexpr char DEVICE_VERSION[] = "2.2.0";
+constexpr char DEVICE_VERSION[] = "2.2.1";
 constexpr char RELEASE_MANIFEST[] = "https://github.com/xlle-er/LOOI-DF26-Firmware/releases/latest/download/looi-s3-manifest.json";
 
 class LooiWifiOta {
@@ -341,7 +342,7 @@ class LooiWifiOta {
     networkError="Too many release redirects";return false;
   }
   bool validChannel(const String &channel) { return channel=="stable" || channel=="preview"; }
-  bool fetchManifest(JsonDocument &result,const String &channel,String &networkError) {
+  bool fetchChannelManifest(JsonDocument &result,const String &channel,String &networkError) {
     if(WiFi.status()!=WL_CONNECTED){networkError="Connect ESP to Wi-Fi before checking online releases";return false;}
     // Certificate verification requires a valid clock; never disable TLS verification.
     if(time(nullptr)<1700000000){configTime(0,0,"pool.ntp.org","time.cloudflare.com");networkError="Synchronizing clock; retry in a few seconds";return false;}
@@ -350,7 +351,17 @@ class LooiWifiOta {
     if(http.getSize()>8192){http.end();networkError="Release manifest too large";return false;}
     String body=http.getString();http.end();StaticJsonDocument<8192> manifest;
     if(body.length()>8192||deserializeJson(manifest,body)||manifest["chip"]!="ESP32-S3"||manifest["partition"]!=HARDWARE_PARTITION||manifest["board"]!=HARDWARE_BOARD||manifest["hardware_protocol"]!=1||!trustedUrl(manifest["url"]|"")) {networkError="Incompatible release manifest";return false;}
+    if(!LooiReleaseVersion::valid(manifest["version"].as<std::string>())||manifest["size"].as<size_t>()<32||manifest["size"].as<size_t>()>3145728||String(manifest["sha256"]|"").length()!=64){networkError="Invalid release manifest";return false;}
     manifest["channel"]=channel; result["release"]=manifest.as<JsonObjectConst>();return true;
+  }
+  bool fetchManifest(JsonDocument &result,const String &channel,String &networkError) {
+    bool stable=fetchChannelManifest(result,"stable",networkError);
+    if(channel!="preview")return stable;
+    DynamicJsonDocument preview(8192);String previewError;
+    bool available=fetchChannelManifest(preview,"preview",previewError);
+    if(available&&(!stable||LooiReleaseVersion::compare(preview["release"]["version"].as<std::string>(),result["release"]["version"].as<std::string>())>0))result.set(preview);
+    if(stable||available){networkError="";return true;}
+    return false;
   }
   bool startJob(bool check,const String &channel) {
     if(!events_) { error_="OTA queue unavailable"; return false; }
@@ -403,7 +414,7 @@ class LooiWifiOta {
       else if(event.kind==2) {
         jobBusy_=false;DynamicJsonDocument release(12288);
         if(!error_.isEmpty()||deserializeJson(release,manifestBody_)||release["size"].as<size_t>()<32||release["size"].as<size_t>()>3145728||String(release["sha256"]|"").length()!=64) { error_="Invalid release manifest";jobPhase_="failed"; }
-        else { checkedVersion_=release["version"].as<String>();checkedChannel_=jobChannel_;checkedUrl_=release["url"].as<String>();checkedSize_=release["size"];checkedSha_=release["sha256"].as<String>();jobPhase_="ready"; }
+        else { checkedVersion_=release["version"].as<String>();checkedChannel_=release["channel"].as<String>();checkedUrl_=release["url"].as<String>();checkedSize_=release["size"];checkedSha_=release["sha256"].as<String>();jobPhase_="ready"; }
         manifestBody_="";
       }
       else if(event.kind==3) { if(writing_)writeChunk(event.data,event.size); }
