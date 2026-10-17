@@ -4,7 +4,7 @@
 
 ## BLE
 
-- Name: `LOOI Body`
+- Name: `LOOI-<ID suffix or custom name>` (2.2.0+); older firmware uses `LOOI Body`
 - Service: `7f2c2b6a-2d8f-4f6b-9a59-8a7f9d7c0001`
 - Write: `7f2c2b6a-2d8f-4f6b-9a59-8a7f9d7c0002`
 - Notify: `7f2c2b6a-2d8f-4f6b-9a59-8a7f9d7c0003`
@@ -69,3 +69,20 @@ OTA applications embed `LOOI_HW_V1|BOARD|1|PARTITION|END`, checked across stream
 ### OTA update channels
 
 `firmware_check` and `firmware_install` accept `channel: "stable" | "preview"`, default `stable`; installation must supply the same channel as the preceding check. Unknown channels are rejected. Stable uses the existing latest/download manifest; preview uses releases/download/preview/ with the same per-board manifest names. The rolling `preview` release is marked prerelease and contains only channel pointers to immutable version-tagged application URLs. The device always enforces profile compatibility, HTTPS, size and SHA-256 regardless of channel. Local-file OTA is an explicit selection outside this online-channel preference.
+
+## Device identity and asynchronous OTA (2.2.0+)
+
+BLE advertises the service UUID unchanged. The full local name is in scan response: `LOOI-<last six ID characters>` by default, or `LOOI-<custom name>`. `device_id` and mDNS hostname never change. Identity is a separate NVS blob; the v2 network/calibration record and hardware profile are preserved.
+
+| Command | Request / result |
+| --- | --- |
+| `admin_auth` | Verify current administration credentials; returns status without credentials |
+| `device_name_set` | `name`: visible UTF-8 text, 1–24 bytes; persists, ACKs `restarting: true`, then reboots |
+| `admin_password_set` | `new_password`: 8–63 printable ASCII characters; becomes HTTP, BLE/USB management and hotspot password after reboot |
+| `ota_start` | Optional `hotspot: true` explicitly opens AP; AP also opens when STA is disconnected |
+| `firmware_check` | Returns `job_id`, `ota_phase: checking`; poll `ota_status` until `ready` or `failed` |
+| `firmware_install` | Checked `version` and matching `channel`; returns job acknowledgement before downloading |
+
+Management mutations and authentication over BLE/USB require `admin_password`. HTTP retains Basic authentication, CSRF and client identifiers. Status advertises `device_identity`, `admin_password`, `async_ota` capabilities, plus `device_name_custom` / `ap_name_custom`. Passwords are never returned. Name/password updates stop motors, deliver the ACK using the current connection, then reboot after 1.5 seconds; clients reconnect and verify identity.
+
+OTA status reports `job_id`, `ota_phase` (`idle`, `checking`, `ready`, `downloading`, `failed`, `rebooting`), `ota_progress` (0–100), `error`, and the checked `release`. Network reads run on a worker; the Arduino loop alone owns flash writes and services status between bounded chunks. An active download cannot be replaced or exited. Failed jobs leave motors locked until explicit exit; clients may offer hotspot recovery after the job has ended. A reboot acknowledgement is not proof of completion: reconnect and verify `device_id` and `firmware_version`.

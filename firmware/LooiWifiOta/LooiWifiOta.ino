@@ -187,9 +187,9 @@ void setup() {
   Serial.println("[BOOT] ESP32 will only execute short, safe motor commands");
 
   setupPins();
-  if(nvsHealthy) setupBle();
   stopMotors("boot");
   wifiOta.begin(stopForDevice, executeDeviceCommand, testDeviceWheels);
+  if(nvsHealthy) setupBle();
   Serial.println("[OTA] Hold BOOT for 3 seconds to enter Wi-Fi update mode");
 }
 
@@ -304,7 +304,7 @@ void setupBle() {
   initializeNvsForBle();
   releaseClassicBluetoothMemory();
 
-  NimBLEDevice::init(BLE_DEVICE_NAME);
+  NimBLEDevice::init(wifiOta.ssid().c_str());
   NimBLEDevice::setPower(9);
 
   bleServer = NimBLEDevice::createServer();
@@ -321,7 +321,9 @@ void setupBle() {
 
   NimBLEAdvertising *advertising = NimBLEDevice::getAdvertising();
   advertising->enableScanResponse(true);
-  advertising->setName(BLE_DEVICE_NAME);
+  NimBLEAdvertisementData scanData;
+  scanData.setName(wifiOta.ssid().c_str());
+  advertising->setScanResponseData(scanData);
   advertising->addServiceUUID(BLE_SERVICE_UUID);
   advertising->addTxPower();
   advertising->start();
@@ -488,7 +490,7 @@ void handleJsonMessage(const uint8_t *payload, size_t length) {
     return;
   }
 
-  if (strcmp(type, "config_update") == 0 && commandSource == "ble" && String(root["admin_password"] | "") != OTA_PASSWORD) {
+  if (strcmp(type, "config_update") == 0 && commandSource == "ble" && String(root["admin_password"] | "") != wifiOta.adminPassword()) {
     sendError(type, "Device administrator password required", requestId); return;
   }
   if (strcmp(type, "config_update") == 0 && wifiOta.locked()) {
@@ -1232,7 +1234,7 @@ void readUsbLine(Stream &port, String &buffer, bool &overflow, const char *sourc
     buffer="";
     if(!request["id"].is<const char *>() || strlen(request["id"].as<const char *>())>80) continue;
     String type=request["type"] | "";
-    if(type!="hardware_get" && type!="hardware_set" && type!="device_status") {
+    if(type!="hardware_get" && type!="hardware_set" && type!="device_status" && type!="admin_auth" && type!="device_name_set" && type!="admin_password_set") {
       reply["id"]=request["id"]; reply["type"]="error"; reply["accepted"]=false; reply["message"]="USB supports hardware management only";
     } else wifiOta.handle(request.as<JsonObjectConst>(),reply,source);
     serializeJson(reply,port); port.println(); port.flush();

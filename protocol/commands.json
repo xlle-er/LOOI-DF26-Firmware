@@ -23,6 +23,9 @@
     "firmware_check",
     "firmware_install",
     "hardware_get",
-    "hardware_set"
+    "hardware_set",
+    "admin_auth",
+    "device_name_set",
+    "admin_password_set"
   ]
 }
