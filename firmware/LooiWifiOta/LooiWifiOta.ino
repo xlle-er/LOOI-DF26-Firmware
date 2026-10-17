@@ -476,7 +476,7 @@ void handleJsonMessage(const uint8_t *payload, size_t length) {
     return;
   }
   if (strcmp(type, "motion") == 0 && !wifiOta.allowMotion(commandSource, root["control_token"] | 0u)) {
-    sendError(type, "Control busy, expired, or locked; acquire control first", requestId);
+    sendError(type, wifiOta.motionBlockReason().c_str(), requestId);
     return;
   }
   if (strcmp(type, "motion") == 0) {

@@ -1,4 +1,5 @@
 #include "../HardwareConfig.h"
+#include "../DeviceIdentity.h"
 #include <cassert>
 JsonDocument request() {
  JsonDocument d;auto h=d.to<JsonObject>();h["version"]=1;h["board"]=HARDWARE_BOARD;
@@ -8,6 +9,13 @@ int main() {
  HardwareConfig blank;blank.load(true);assert(!blank.ready && !blank.configured());
  auto doc=request();assert(blank.save(doc.as<JsonObjectConst>()));assert(!blank.ready && !blank.configured());
  HardwareConfig afterRestart;afterRestart.load(true);assert(afterRestart.configured() && !afterRestart.ready);assert(afterRestart.profile.pins[0]==1);
+ // A 2.1 hardware profile must survive the 2.2 identity/password namespace.
+ auto profileBeforeIdentity=Preferences::bytes;
+ Preferences identityStore;assert(identityStore.begin("looi-device",false));DeviceIdentity identity;
+ strcpy(identity.name,"测试机器人");strcpy(identity.password,"new-password");
+ assert(identityStore.putBytes("identity",&identity,sizeof(identity))==sizeof(identity));
+ assert(Preferences::bytes==profileBeforeIdentity);
+ HardwareConfig afterIdentity;afterIdentity.load(true);assert(afterIdentity.configured() && afterIdentity.profile.pins[0]==1);
  auto saved=Preferences::bytes;Preferences::writeOk=false;doc["pins"]["ena"]=10;assert(!afterRestart.save(doc.as<JsonObjectConst>()));assert(Preferences::bytes==saved);assert(afterRestart.profile.pins[0]==1);
  Preferences::writeOk=true;
  for(auto bad : {"bool","float","duplicate","reserved","version","versionbool","extra","board","missing"}) {

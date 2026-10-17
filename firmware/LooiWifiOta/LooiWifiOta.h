@@ -21,7 +21,7 @@
 #include <freertos/task.h>
 
 constexpr char OTA_PASSWORD[] = "12345678";
-constexpr char DEVICE_VERSION[] = "2.2.1";
+constexpr char DEVICE_VERSION[] = "2.2.2";
 constexpr char RELEASE_MANIFEST[] = "https://github.com/xlle-er/LOOI-DF26-Firmware/releases/latest/download/looi-s3-manifest.json";
 
 class LooiWifiOta {
@@ -73,6 +73,11 @@ class LooiWifiOta {
     if (locked() || !hardware.ready) return false;
     if (authority_.expired(millis())) revoke();
     return authority_.allow(source.c_str(), controlToken, millis());
+  }
+  String motionBlockReason() const {
+    if(locked())return "Exit upgrade mode before moving";
+    if(!hardware.ready)return hardware.error;
+    return "Another controller is active; explicitly take control";
   }
   void loop() {
     uint32_t now = millis();
@@ -168,7 +173,7 @@ class LooiWifiOta {
       else { next.mapping.leftInvert=root["left_invert"]; next.mapping.rightInvert=root["right_invert"]; next.mapping.swap=root["swap"]; }
       if(!persist(next)) reject("Could not save calibration"); else status(reply);
     } else if(type=="calibration_test") {
-      if(!allowMotion(source, root["control_token"] | 0u)) reject("Acquire control before testing");
+      if(!allowMotion(source, root["control_token"] | 0u)) reject(motionBlockReason());
       else {
         String direction=root["direction"] | ""; float l=0,r=0;
         if(direction=="forward") l=r=0.25f;
@@ -190,7 +195,7 @@ class LooiWifiOta {
       if(root["hotspot"]==true || WiFi.status()!=WL_CONNECTED)openAp();
       status(reply);
     }
-    else if(type=="ota_exit") { if(writing_||jobBusy_) reject("Update in progress"); else { otaMode_=false; revoke(); jobPhase_="idle"; } }
+    else if(type=="ota_exit") { if(writing_||jobBusy_) reject("Update in progress"); else { otaMode_=false; revoke(); jobPhase_="idle"; status(reply); } }
     else if(type=="firmware_check" || type=="firmware_install") {
       String channel=root["channel"] | "stable";
       if(jobBusy_||writing_||reboot_)reject("Update in progress");
